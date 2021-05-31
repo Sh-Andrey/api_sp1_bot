@@ -62,7 +62,8 @@ def send_message(message, bot_client):
 def main():
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
-    logging.info('Бот запущен.')
+    logging.debug('Бот запущен.')
+    send_message('Бот запущен.', bot)
 
     while True:
         try:
@@ -79,6 +80,7 @@ def main():
 
         except Exception as error:
             logging.error(f'Бот столкнулся с ошибкой: {error}', exc_info=True)
+            send_message(f'Бот столкнулся с ошибкой: {error}', bot)
             time.sleep(5)
 
 
