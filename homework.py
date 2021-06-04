@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-LOG_DIR = os.path.expanduser('./logs/bot.log')
+LOG_DIR = os.path.expanduser('./bot.log')
 
 logger = logging.getLogger('bot')
 logger.setLevel(logging.DEBUG)
