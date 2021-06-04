@@ -1,24 +1,29 @@
 import json
-import logging
+import logging.handlers
 import os
 import time
-from logging.handlers import RotatingFileHandler
 
 import requests
 import telegram
 from dotenv import load_dotenv
 
 load_dotenv()
-logging.basicConfig(
-    level=logging.DEBUG,
-    filename='bot.log',
-    filemode='w',
-    format='%(asctime)s, %(levelname)s, %(name)s, %(message)s',
-)
-handler = RotatingFileHandler('bot.log', maxBytes=50000000, backupCount=5)
+
+LOG_DIR = os.path.expanduser('./logs/bot.log')
+
+logger = logging.getLogger('bot')
+logger.setLevel(logging.DEBUG)
+handler = logging.handlers.RotatingFileHandler(LOG_DIR,
+                                               maxBytes=100000,
+                                               backupCount=5)
+format = '[%(asctime)s] [%(levelname)s] [%(name)s] => %(message)s'
+date = '%H:%M:%S'
+formatter = logging.Formatter(format, date)
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 try:
-    f = open('bot.log')
+    f = open(LOG_DIR)
     f.close()
 except FileNotFoundError:
     print('Файл с логами не найден.')
@@ -28,12 +33,14 @@ try:
     TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN']
     CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
 except KeyError:
-    logging.error('Не удалось получить токены.')
+    logger.critical('Не удалось получить токены. Бот остановлен.')
     SystemExit(1)
 
-
 BOT_START = 'Бот запущен.'
+BOT_SENT = 'Бот отправил сообщение. '
 BOT_ERROR = 'Бот столкнулся с ошибкой: '
+STATUS_ERROR = 'Получен незвестный статус.'
+THERE_IS_NO_DATA = 'Не удалось получить данные.'
 
 STATUS = {
     'rejected': 'К сожалению в работе нашлись ошибки.',
@@ -53,12 +60,12 @@ def parse_homework_status(homework):
     homework_status = homework.get('status')
 
     if homework_name is None or homework_status is None:
-        logging.error('Не удалось получить данные.')
-        return 'Не удалось получить данные.'
+        logger.error(THERE_IS_NO_DATA)
+        return THERE_IS_NO_DATA
 
     if homework_status not in STATUS:
-        logging.error('Получен незвестный статус.')
-        return 'Получен незвестный статус.'
+        logger.error(STATUS_ERROR)
+        return STATUS_ERROR
 
     if homework_status == 'reviewing':
         return STATUS[homework_status]
@@ -83,7 +90,7 @@ def get_homework_statuses(current_timestamp):
         homework_statuses = homework_statuses.json()
     except (requests.exceptions.RequestException,
             json.JSONDecodeError) as error:
-        logging.error(f'{BOT_ERROR}{error}', exc_info=True)
+        logger.error(f'{BOT_ERROR}{error}', exc_info=True)
     return homework_statuses
 
 
@@ -92,20 +99,19 @@ def send_message(message, bot_client):
 
 
 def main():
-    current_timestamp = 0
+    current_timestamp = int(time.time())
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    logging.debug(BOT_START)
+    logger.debug(BOT_START)
     send_message(BOT_START, bot)
 
     while True:
         try:
             new_homework = get_homework_statuses(current_timestamp)
-
             if new_homework.get('homeworks'):
                 homework_get = new_homework.get('homeworks')[0]
                 parse_status = parse_homework_status(homework_get)
                 send_message(parse_status, bot)
-                logging.info(f'Бот отправил сообщение. {parse_status}')
+                logger.info(f'{BOT_SENT}{parse_status}')
             current_timestamp = new_homework.get(
                 'current_date', current_timestamp
             )
@@ -113,7 +119,7 @@ def main():
             time.sleep(300)
 
         except Exception as error:
-            logging.error(f'{BOT_ERROR}{error}', exc_info=True)
+            logger.error(f'{BOT_ERROR}{error}', exc_info=True)
             send_message(f'{BOT_ERROR}{error}', bot)
             time.sleep(5)
 
