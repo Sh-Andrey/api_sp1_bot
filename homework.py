@@ -18,25 +18,27 @@ handler = RotatingFileHandler(LOG_PATH,
                               maxBytes=1000000,
                               backupCount=3)
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='[%(asctime)s] [%(levelname)s] [%(name)s] => %(message)s',
     handlers=[handler]
 )
 
-BOT_START = 'Бот запущен.'
-BOT_SENT = 'Бот отправил сообщение. '
-BOT_ERROR = 'Бот столкнулся с ошибкой: '
-STATUS_ERROR = 'Получен незвестный статус.'
-THERE_IS_NO_DATA = 'Не удалось получить данные.'
-BOT_ERROR_TOKEN = 'Не удалось получить токены. Бот остановлен.'
+BOT_STATUSES ={
+    'start': 'Бот запущен.',
+    'sent': 'Бот отправил сообщение. ',
+    'error': 'Бот столкнулся с ошибкой: ',
+    'error_token': 'Не удалось получить токены. Бот остановлен.',
+    'there_is_no_data': 'Не удалось получить данные.',
+    'status_error': 'Получен незвестный статус.'
+}
 
 try:
     PRAKTIKUM_TOKEN = os.environ['PRAKTIKUM_TOKEN']
     TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN']
     CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
 except KeyError:
-    logging.critical(BOT_ERROR_TOKEN)
-    raise SystemExit(BOT_ERROR_TOKEN)
+    logging.critical(BOT_STATUSES['error_token'])
+    raise SystemExit(BOT_STATUSES['error_token'])
 
 HOMEWORK_STATUSES = {
     'rejected': 'К сожалению в работе нашлись ошибки.',
@@ -56,12 +58,12 @@ def parse_homework_status(homework):
     homework_status = homework.get('status')
 
     if homework_name is None or homework_status is None:
-        logging.error(THERE_IS_NO_DATA)
-        return THERE_IS_NO_DATA
+        logging.error(BOT_STATUSES['there_is_no_data'])
+        return BOT_STATUSES['there_is_no_data']
 
     if homework_status not in HOMEWORK_STATUSES:
-        logging.error(STATUS_ERROR)
-        return STATUS_ERROR
+        logging.error(BOT_STATUSES['status_error'])
+        return BOT_STATUSES['status_error']
 
     if homework_status == 'reviewing':
         return HOMEWORK_STATUSES[homework_status]
@@ -70,9 +72,7 @@ def parse_homework_status(homework):
 
 
 def get_homework_statuses(current_timestamp):
-    if current_timestamp is None:
-        current_timestamp = int(time.time())
-
+    current_timestamp = current_timestamp or int(time.time())
     from_date = {
         'from_date': current_timestamp
     }
@@ -85,7 +85,8 @@ def get_homework_statuses(current_timestamp):
         homework_statuses = homework_statuses.json()
     except (requests.exceptions.RequestException,
             json.JSONDecodeError) as error:
-        logging.error(f'{BOT_ERROR}{error}', exc_info=True)
+        logging.error(f'{BOT_STATUSES["error"]}{error}', exc_info=True)
+        return f'{BOT_STATUSES["error"]}{error}'
     return homework_statuses
 
 
@@ -96,17 +97,18 @@ def send_message(message, bot_client):
 def main():
     current_timestamp = int(time.time())
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    logging.debug(BOT_START)
-    send_message(BOT_START, bot)
+    logging.info(BOT_STATUSES['start'])
 
     while True:
         try:
             new_homework = get_homework_statuses(current_timestamp)
+            if new_homework == BOT_STATUSES['error']:
+                send_message(new_homework, bot)
             homework = new_homework.get('homeworks')
-            if homework:
+            if homework is None:
                 parse_status = parse_homework_status(homework[0])
                 send_message(parse_status, bot)
-                logging.info(f'{BOT_SENT}{parse_status}')
+                logging.info(f'{BOT_STATUSES["sent"]}{parse_status}')
             current_timestamp = new_homework.get(
                 'current_date', current_timestamp
             )
@@ -114,8 +116,8 @@ def main():
             time.sleep(300)
 
         except Exception as error:
-            logging.error(f'{BOT_ERROR}{error}', exc_info=True)
-            send_message(f'{BOT_ERROR}{error}', bot)
+            logging.error(f'{BOT_STATUSES["error"]}{error}', exc_info=True)
+            send_message(f'{BOT_STATUSES["error"]}{error}', bot)
             time.sleep(5)
 
 
