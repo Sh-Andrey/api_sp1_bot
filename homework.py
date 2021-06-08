@@ -23,7 +23,7 @@ logging.basicConfig(
     handlers=[handler]
 )
 
-BOT_STATUSES ={
+BOT_STATUSES = {
     'start': 'Бот запущен.',
     'sent': 'Бот отправил сообщение. ',
     'error': 'Бот столкнулся с ошибкой: ',
