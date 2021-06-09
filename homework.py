@@ -102,10 +102,15 @@ def main():
     while True:
         try:
             new_homework = get_homework_statuses(current_timestamp)
-            if new_homework == BOT_STATUSES['error']:
+            if isinstance(new_homework, str):
+                new_homework.startswith(BOT_STATUSES['error'])
                 send_message(new_homework, bot)
+                time.sleep(300)
+                continue
             homework = new_homework.get('homeworks')
-            if homework is None:
+            if not homework:
+                continue
+            if homework is not None:
                 parse_status = parse_homework_status(homework[0])
                 send_message(parse_status, bot)
                 logging.info(f'{BOT_STATUSES["sent"]}{parse_status}')
